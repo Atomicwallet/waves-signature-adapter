@@ -1,16 +1,21 @@
 import { AdapterType } from '../config';
-import { config } from '@waves/signature-generator';
 import { SIGN_TYPE, TSignData } from '../prepareTx';
+import { libs, serializeCustomData } from '@waves/waves-transactions';
 import { Signable } from '../Signable';
+const { stringToBytes } = libs.crypto;
 
 
 export abstract class Adapter {
 
     public type: string;
+    protected _code: number;
+    protected _isDestroyed = true;
     protected static _code: number;
 
-    protected constructor() {
+    protected constructor(networkCode?: string | number) {
+        networkCode = typeof networkCode === 'string' ? networkCode.charCodeAt(0) : networkCode;
         this.type = (this as any).constructor.type;
+        this._code = networkCode || Adapter._code || ('W').charCodeAt(0);
     }
 
     public makeSignable(forSign: TSignData): Signable {
@@ -25,6 +30,18 @@ export abstract class Adapter {
         return;
     }
 
+    public getNetworkByte(): number {
+        return this._code || Adapter._code;
+    }
+
+    public isDestroyed(): boolean {
+        return this._isDestroyed;
+    }
+    
+    public abstract getSyncAddress(): string;
+    
+    public abstract getSyncPublicKey(): string;
+    
     public abstract getSignVersions(): Record<SIGN_TYPE, Array<number>>;
 
     public abstract getPublicKey(): Promise<string>;
@@ -35,22 +52,55 @@ export abstract class Adapter {
 
     public abstract signRequest(databytes: Uint8Array, signData?: any): Promise<string>;
 
-    public abstract signTransaction(bytes: Uint8Array, amountPrecision: number, signData?: any): Promise<string>;
+    public abstract signTransaction(bytes: Uint8Array, precisions: Record<string, number>, signData?: any): Promise<string>;
 
-    public abstract signOrder(bytes: Uint8Array, amountPrecision: number, signData: any): Promise<string>;
+    public abstract signOrder(bytes: Uint8Array, precisions: Record<string, number>, signData: any): Promise<string>;
 
     public abstract signData(bytes: Uint8Array): Promise<string>;
 
     public abstract getSeed(): Promise<string>;
+    
+    public abstract getEncodedSeed(): Promise<string>;
 
     public static initOptions(options: { networkCode: number }) {
-        this._code = options.networkCode;
-        config.set({ networkByte: options.networkCode });
+        Adapter._code = options.networkCode;
     }
 
+    public signCustomData(data: string|Array<number>|Uint8Array) {
+        const bytes = typeof data === 'string' ? stringToBytes(data) : Uint8Array.from(data);
+        const serializeData = { version: 1, binary: libs.crypto.base64Encode(bytes) } as any;
+        const binary = serializeCustomData(serializeData);
+        return this.signRequest(binary, { type: 'customData', ...serializeData })
+    }
+    
+    public signApiTokenData(clientId: string, timestamp = Date.now()): Promise<{
+        networkByte: number,
+        signature: string,
+        clientId: string,
+        publicKey: string,
+        seconds: number }
+        > {
+        
+        const netByte = typeof this._code === 'string' ? this._code : String.fromCharCode(this._code);
+        return this.getPublicKey()
+            .then(publicKey => {
+                const seconds = Math.floor(timestamp / 1000);
+                const data = `${netByte}:${clientId}:${String(seconds)}`;
+                return this.signCustomData(data).then(signature => {
+                    return {
+                        signature,
+                        publicKey,
+                        seconds,
+                        clientId,
+                        networkByte: this._code,
+                    }
+                });
+            })
+    }
+    
     public static type: AdapterType = AdapterType.Seed;
 
-    public static getUserList(): Promise<Array<string>> {
+    public static getUserList(): Promise<Array<any>> {
         return Promise.resolve([]);
     }
 
@@ -69,11 +119,20 @@ export interface IAdapterConstructor {
     isAvailable(): Promise<boolean>;
 }
 
-export interface IUser {
+export interface ISeedUser {
     encryptedSeed: string;
     password: string;
-    encryptionRounds: number;
+    encryptionRounds?: number;
 }
+
+export interface IPrivateKeyUser {
+    encryptedPrivateKey: string;
+    password: string;
+    encryptionRounds?: number;
+}
+
+
+export type IUser = ISeedUser|IPrivateKeyUser;
 
 export interface IProofData {
     profs?: Array<string>;

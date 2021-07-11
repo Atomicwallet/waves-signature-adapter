@@ -1,6 +1,6 @@
 {
   "name": "@waves/signature-adapter",
-  "version": "4.3.0",
+  "version": "6.1.1",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "license": "MIT",
@@ -9,28 +9,31 @@
     "url": "https://github.com/wavesplatform/waves-signature-adapter"
   },
   "dependencies": {
-    "@types/ramda": "^0.25.46",
-    "@waves/data-entities": "^1.6.3",
-    "@waves/ledger": "^3.0.1",
-    "@waves/marshall": "^0.6.0",
-    "@waves/signature-generator": "^5.0.0",
-    "@waves/ts-types": "^0.2.0-beta-1",
+    "@types/ramda": "^0.27.3",
+    "@waves/bignumber": "^1.0.0",
+    "@waves/data-entities": "^2.0.3",
+    "@waves/ledger": "^4.0.0",
+    "@waves/money-like-to-node": "0.1.3",
+    "@waves/ts-types": "^0.2.0",
+    "@waves/waves-transactions": "4.1.3",
     "ramda": "^0.25.0"
   },
   "scripts": {
     "test": "jest",
     "compile": "tsc",
-    "browserify": "node_modules/.bin/browserify dist/index.js -s wavesSignatureAdapter -u @waves/data-entities -u @waves/signature-generator -u @waves/marshall  -u @waves/ledger -o dist/signature-adapter.js",
+    "browserify": "node_modules/.bin/browserify dist/index.js -s wavesSignatureAdapter -u @waves/waves-crypto -u @waves/bignumber -u @waves/waves-transactions -u @waves/data-entities -u @waves/marshall -u @waves/ledger -o dist/signature-adapter.js",
     "build": "npm run compile && npm run browserify && npm run uglify",
     "uglify": "node_modules/.bin/uglifyjs dist/signature-adapter.js -o dist/signature-adapter.min.js",
-    "postpublish": "git push",
+    "postpublish": "git push origin HEAD",
     "postversion": "npm publish",
     "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/jest": "^23.3.2",
-    "browserify": "^16.2.3",
-    "jest": "^23.6.0",
+    "@types/node-fetch": "^2.5.5",
+    "browserify": "^16.5.1",
+    "jest": "^24.8.0",
+    "node-fetch": "^2.6.1",
     "ts-jest": "^23.10.3",
     "typescript": "^3.2.2",
     "uglify-js": "^3.4.7"
@@ -51,7 +54,7 @@
       "^.+\\.(ts|tsx)$": "ts-jest"
     },
     "testMatch": [
-      "**/test/*.+(ts|tsx|js)"
+      "**/test/tests_*.+(ts|tsx|js)"
     ]
   }
 }

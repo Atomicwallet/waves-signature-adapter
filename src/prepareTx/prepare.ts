@@ -1,6 +1,11 @@
-import { Money, BigNumber, AssetPair, OrderPrice } from '@waves/data-entities';
-import { WAVES_ID, libs, config } from '@waves/signature-generator';
+import { Money, AssetPair, OrderPrice } from '@waves/data-entities';
+import { BigNumber } from '@waves/bignumber';
+import { libs } from '@waves/waves-transactions';
 import { VALIDATORS } from './fieldValidator';
+
+export const WAVES_ID = 'WAVES';
+const { stringToBytes, base58Encode } = libs.crypto;
+
 
 //@ts-ignore
 const normalizeAssetId = id => id === WAVES_ID ? '' : id;
@@ -11,8 +16,11 @@ export module prepare {
     
     export module processors {
         
-        export function callFunc(callData?: ICall|null): ICall {
-            callData = callData || Object.create(null);
+        export function callFunc(callData?: ICall|null): ICall|null {
+            if (!callData) {
+                return null;
+            }
+            
             return {
                 function: callData && callData.function || '',
                 args: callData && callData.args || [],
@@ -41,16 +49,14 @@ export module prepare {
             return !!(code || '').replace('base64:', '') ? code : null;
         }
         
-        //@ts-ignore
-        export function assetPair(data) {
+        export function assetPair(data: any) {
             return {
                 amountAsset: normalizeAssetId(data.amount.asset.id),
                 priceAsset: normalizeAssetId(data.price.asset.id)
             };
         }
         
-        //@ts-ignore
-        export function signatureFromProof(proofs) {
+        export function signatureFromProof(proofs: any) {
             return proofs[0];
         }
         
@@ -72,8 +78,8 @@ export module prepare {
             return toBigNumber(some).toString();
         }
         
-        export function toSponsorshipFee(moeny: Money): BigNumber {
-            const coins = moeny.getCoins();
+        export function toSponsorshipFee(money: Money): BigNumber {
+            const coins = money.getCoins();
             if (coins.eq(0)) {
                 //@ts-ignore
                 return null;
@@ -90,34 +96,35 @@ export module prepare {
             return idToNode(money.asset.id);
         }
         
-        //@ts-ignore
-        export function timestamp(time) {
+        export function timestamp(time: string|number|Date) {
             if (!(+time) && typeof time === 'string') {
                 return Date.parse(time);
             }
             return time && time instanceof Date ? time.getTime() : time;
         }
         
-        //@ts-ignore
-        export function orString(data): string {
+        export function orString(data: any | string): string {
             return data || '';
         }
         
-        //@ts-ignore
-        export function noProcess(data) {
+        export function noProcess<T>(data: T): T {
             return data;
         }
         
         //@ts-ignore
-        export function recipient(data) {
-            const code = String.fromCharCode(config.get('networkByte'));
-            return data.length < 30 ? `alias:${code}:${data}` : data;
-        }
+        export const recipient = networkByte => data => {
+            return data.length <= 30 ? `alias:${networkByte}:${data}` : data;
+        };
         
-        export function attachment(data: string) {
+        export function attachment(data: string | Array<number> | Uint8Array) {
             data = data || '';
-            const value = Uint8Array.from(libs.converters.stringToByteArray(data));
-            return libs.base58.encode(Uint8Array.from(value));
+            let value = data;
+            
+            if (typeof data === 'string') {
+                value = stringToBytes(data);
+            }
+            
+            return base58Encode(Uint8Array.from(value as ArrayLike<number>));
         }
         
         export function addValue(value: any) {
@@ -140,7 +147,7 @@ export module prepare {
         
         //@ts-ignore
         export function quantity(data): BigNumber {
-            return new BigNumber(data.quantity).times(new BigNumber(10).pow(data.precision));
+            return new BigNumber(data.quantity).mul(new BigNumber(10).pow(data.precision));
         }
         
         //@ts-ignore
@@ -164,7 +171,14 @@ export module prepare {
         //@ts-ignore
         return { from, to, cb };
     }
-    
+
+    const findValue = (fromKey: string | string[], data: Record<string, string>) => {
+        if (!Array.isArray(fromKey)) {
+            return data[fromKey];
+        }
+        return data[fromKey.find(key => data[key]) || fromKey[0]];
+    }
+
     export interface IWrappedFunction {
         from: string;
         to: string;
@@ -189,17 +203,19 @@ export module prepare {
     }
     
     //@ts-ignore
-    export function signSchema(args: Array<{ name, field, processor, optional, type }>) {
+    export function signSchema(args: Array<{ name, field, processor, optional, type, optionalData }>) {
         //@ts-ignore
         return (data, validate = false) => {
             const errors: Array<any> = [];
             const prepareData = args.map((item) => {
                     const wrapped = <IWrappedFunction>wrap(item.name, item.field, item.processor || processors.noProcess);
-                    
+                    const value = wrapped.from ? findValue(wrapped.from, data) : data;
+
                     const validateOptions = {
                         key: wrapped.to,
-                        value: wrapped.from ? data[wrapped.from] : data,
+                        value: value,
                         optional: item.optional,
+                        optionalData: item.optionalData,
                         type: item.type,
                         name: item.name,
                     };

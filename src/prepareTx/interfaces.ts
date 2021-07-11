@@ -1,6 +1,6 @@
 import { SIGN_TYPE } from './constants';
-import { IDATA_ENTRY } from '@waves/signature-generator/src/signatureFactory/interface';
-import { Money, BigNumber } from '@waves/data-entities';
+import { Money } from '@waves/data-entities';
+import { BigNumber } from '@waves/bignumber';
 
 export interface IARGS_ENTRY {
     type: string;
@@ -25,8 +25,9 @@ export type TSignData =
     IDataTxData |
     ISetScriptData |
     ISponsorshipData |
-    ISetAssetScriptData|
-    IScriptInvocationData;
+    ISetAssetScriptData |
+    IScriptInvocationData |
+    ISIgnUpdateAssetInfo;
 
 export interface ISignAuthData {
     data: IAuthData;
@@ -71,6 +72,11 @@ export interface ISignReissue {
 export interface ISignBurn {
     data: IBurn;
     type: SIGN_TYPE.BURN;
+}
+
+export interface ISIgnUpdateAssetInfo {
+    data: IUpdateAssetInfo;
+    type: SIGN_TYPE.UPDATE_ASSET_INFO;
 }
 
 export interface ISignExchange {
@@ -126,11 +132,11 @@ export interface IScriptInvocationData {
 
 export interface IScriptInvocation extends ICreateTxData {
     payment: [Money] | [];
-    dappAddress: string;
+    dApp: string;
     call: {
         function: string;
         args?: Array<IARGS_ENTRY>;
-    };
+    } | null;
 }
 
 export interface IAuthData {
@@ -214,6 +220,12 @@ export interface IBurn extends ICreateTxData {
     amount: string | BigNumber | Money;
 }
 
+export interface IUpdateAssetInfo extends ICreateTxData {
+    assetId: string;
+    name: string;
+    description: string;
+}
+
 export interface IExchange extends ICreateTxData {
     buyOrder: IOrder;
     sellOrder: IOrder;
@@ -242,6 +254,12 @@ export interface IMassTransfer extends ICreateTxData {
     assetId: string;
     transfers: Array<{ recipient: string; amount: string  | number | BigNumber | Money; }>;
     attachment?: string;
+}
+
+export interface IDATA_ENTRY {
+    key: string;
+    type: string;
+    value: any;
 }
 
 export interface IData extends ICreateTxData {
